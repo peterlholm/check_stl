@@ -8,7 +8,7 @@ O3D = True
 if O3D:
     import open3d as o3d
     
-_DEBUG = False
+_DEBUG = True
 _SHOW = True
 
 # picture formats
@@ -62,11 +62,9 @@ def stl_info(path):
     print("has_triangle_material_ids", mesh.has_triangle_material_ids())
     print("has_vertex_normals", mesh.has_vertex_normals())
     print("is_orientable", mesh.is_orientable())
-    #print("get_volume", mesh.get_volume())
-    #print("get_volume", mesh.get_volume())
 
 def check_stl(path):
-    "Check if stl file is write size and scale orientation"
+    "Check if stl file is right size and scale orientation"
     if not path.exists():
         print("File not found", path)
         return
@@ -86,7 +84,6 @@ def check_stl(path):
     if volume > MAX_VOLUME or volume < MIN_VOLUME:
         print("Volume error", volume)
         CHECK = False
-   
     if _DEBUG:
         stl_info(path)
 
@@ -97,48 +94,57 @@ def check_stl(path):
     if _DEBUG:
         print("stl file",path, "ERROR")
     return False
-    
-def pcl2mesh(filepath):
-    "make a mesh stl file from the filepath"
-    downsample = 0.1
-    pcl =o3d.io.read_point_cloud(str(filepath))
-    if _SHOW:
-        o3d.visualization.draw_geometries([pcl], window_name="input",
-                                  zoom=0.3412,
-                                  front=[0.4257, -0.2125, -0.8795],
-                                  lookat=[2.6172, 2.0475, 1.532],
-                                  up=[-0.0694, -0.9768, 0.2024],
-                                  point_show_normal=True)
+
+PICTURE_SIZE = 1000
+OBJ_CENTER = [0.0,0.0,22.0]
+CAM_POSITION = [0.0, 30.0, 0.0]
+ZOOM = 0.9  # tand    
+
+def stl2jpg(path):
+    "create jpg picture of stl"
+    zoom = ZOOM
+    if not path.exists():
+        print("File not found", path)
+        return
+    CHECK = True
+    outfile = path.with_suffix('.jpg')
+    print(outfile)
+    mesh = o3d.io.read_triangle_mesh(str(path)) 
+    obj_center = mesh.get_center()
+     # camera position
+    vis = o3d.visualization.Visualizer()
+    res = vis.create_window(visible = _DEBUG, width=PICTURE_SIZE, height=PICTURE_SIZE)
+    if not res:
+        print("create window result", res)
+    vis.add_geometry(mesh)
+    mesh_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=20, origin=[0, 0, 0])
+    vis.add_geometry(mesh_frame)
+    ctr = vis.get_view_control()
+    if ctr is None:
+        print("pcl2jpg cant get view_control", vis)
+    # fix position
+    cam_position=CAM_POSITION
     if _DEBUG:
-        outfile = filepath.with_suffix('.in.jpg')
-        pcl2jpg(pcl, outfile)
-        print("Number of points: ", len(pcl.points))
-        print("Downsample the point cloud with a voxel of", downsample)
-    downpcd = pcl.voxel_down_sample(voxel_size=downsample)
-    if _SHOW:
-        o3d.visualization.draw_geometries([mesh],  window_name="mesh",
-                                  zoom=0.3412,
-                                  front=[0.4257, -0.2125, -0.8795],
-                                  lookat=[2.6172, 2.0475, 1.532],
-                                  up=[-0.0694, -0.9768, 0.2024],
-                                  point_show_normal=False,
-                                  mesh_show_back_face=True,
-                                  mesh_show_wireframe=True)
-
-    o3d.io.write_triangle_mesh(str(filepath.with_suffix('.stl')), mesh, print_progress=False)
-
-    # make filtered stl
-    filtered = o3d.geometry.TriangleMesh.filter_smooth_simple(mesh, 5)
-    filtered = filtered.compute_triangle_normals()
-    o3d.io.write_triangle_mesh(str(filepath.with_suffix('.filtered.stl')), filtered, print_progress=False)
-
+        print('object center', obj_center, "cam position:", cam_position, "zoom", zoom)
+    ctr.set_zoom(zoom)
+    ctr.set_front(cam_position)
+    ctr.set_lookat(obj_center)
+    ctr.set_up([+10.0, 0, 0])
+    opt = vis.get_render_option()
+    #opt.point_size = 2.0
+    opt.mesh_show_wireframe = True
+    opt.mesh_show_back_face = True
+    #opt.point_color_option.Color = 1
+    if _DEBUG:
+        vis.run()
+    vis.capture_screen_image(str(outfile), do_render=True)
 
 if __name__=="__main__":
     FILE = Path(__file__).parent / 'testdata/LJ3.stl'
-    FILE = Path(__file__).parent / 'testdata/niels/test3 LowerJawScan.stl'
-
+    #FILE = Path(__file__).parent / 'testdata/niels/test3 LowerJawScan.stl'
     print (FILE)
     #stl_info(FILE)
     #print("CheckStl", check_stl(FILE))
-    show_stl(FILE)
-    
+    #show_stl(FILE)
+    stl2jpg(FILE)
+
